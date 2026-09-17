@@ -6,98 +6,82 @@
 <title>design-gate run</title>
 <!--__REFRESH__-->
 <style>
-  :root {
-    --bg: #f6f5f2; --panel: #ffffff; --ink: #1a1a18; --ink-2: #5c5b57; --ink-3: #8d8b85; --line: #e3e1db;
-    --approve: #1f7a4d; --approve-bg: #e4f3ea; --revise: #a35a00; --revise-bg: #fbeedb; --stop: #8a2f2f; --stop-bg: #f8e3e3;
-    --escalate: #5b3fa3; --escalate-bg: #ebe5f8; --skip: #5c5b57; --skip-bg: #ecebe7; --accent: #1f4fd8;
-    --mono: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, monospace; --sans: "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-  }
-  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-    --bg: #131312; --panel: #1c1c1a; --ink: #ecebe6; --ink-2: #b3b1aa; --ink-3: #7d7b75; --line: #2c2c29;
-    --approve: #6fd39a; --approve-bg: #12301f; --revise: #f0b25c; --revise-bg: #332512; --stop: #f08a8a; --stop-bg: #361818;
-    --escalate: #b9a4f2; --escalate-bg: #241c3a; --skip: #b3b1aa; --skip-bg: #262624; --accent: #7ea0ff;
-  } }
+  :root { --bg: #fafaf8; --ink: #111; --ink-2: #6b6b66; --ink-3: #a3a39d; --line: #e6e5e0; --fail: #b4531c; --ok: #2f6b45; --accent: #111;
+    --mono: "SF Mono", ui-monospace, Menlo, monospace; --sans: -apple-system, "Helvetica Neue", Inter, system-ui, sans-serif; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #141414; --ink: #ededea; --ink-2: #9c9c96; --ink-3: #5f5f5a; --line: #2a2a28; --fail: #e0895a; --ok: #7cc397; --accent: #ededea; } }
   * { box-sizing: border-box; }
-  html, body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 var(--sans); }
-  body { padding: 0 16px 48px; }
-  a { color: var(--accent); }
-  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
-  header.top { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 16px 0 12px; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: baseline; }
-  header.top h1 { font-size: 15px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
-  header.top .meta { color: var(--ink-2); font-size: 13px; }
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; letter-spacing: 0.01em; }
-  .badge.APPROVED { color: var(--approve); background: var(--approve-bg); }
-  .badge.REVISE, .badge.OBSERVATIONS_NEEDED { color: var(--revise); background: var(--revise-bg); }
-  .badge.STOP { color: var(--stop); background: var(--stop-bg); }
-  .badge.ESCALATE { color: var(--escalate); background: var(--escalate-bg); }
-  .badge.SKIPPED, .badge.running { color: var(--skip); background: var(--skip-bg); }
-  .banner { margin: 16px 0 0; padding: 10px 14px; border: 1px solid var(--line); border-left: 3px solid var(--revise); background: var(--panel); border-radius: 6px; font-size: 13px; }
-  .banner code { font-family: var(--mono); font-size: 12px; }
-  .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 16px 0; }
-  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
-  .stat .label { color: var(--ink-3); font-size: 12px; }
-  .stat .value { font-size: 22px; font-weight: 600; margin-top: 2px; }
-  .trend { height: 44px; margin-top: 6px; }
-  .trend svg { width: 100%; height: 100%; overflow: visible; }
-  section h2 { font-size: 13px; font-weight: 600; color: var(--ink-2); text-transform: none; margin: 28px 0 10px; }
-  .film { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(320px, 1fr); gap: 14px; overflow-x: auto; padding: 4px 0 12px; scroll-snap-type: x proximity; }
-  .film[data-turns="1"] { grid-auto-columns: minmax(320px, 720px); }
-  .film[data-turns="2"] { grid-auto-columns: minmax(320px, 1fr); }
-  .film[data-many] { grid-auto-columns: minmax(320px, 400px); }
-  .shots.single { grid-template-columns: 1fr 120px; }
-  .shot.mobile.wide { width: 120px; }
-  .turn { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; scroll-snap-align: start; display: flex; flex-direction: column; gap: 10px; }
-  .turn.final { border-color: var(--approve); box-shadow: 0 0 0 3px var(--approve-bg); }
-  .turn .head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-  .turn .head .n { font-weight: 600; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.6 var(--sans); -webkit-font-smoothing: antialiased; }
+  body { padding: 0 max(24px, 6vw) 96px; max-width: 1360px; margin: 0 auto; }
+  a { color: inherit; }
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 13px; }
+  header.top { display: flex; flex-wrap: wrap; gap: 8px 32px; align-items: baseline; padding: 40px 0 24px; border-bottom: 1px solid var(--line); }
+  header.top h1 { font-size: 15px; font-weight: 500; margin: 0; letter-spacing: 0; }
+  header.top .meta { color: var(--ink-3); font-size: 13px; margin-left: auto; }
+  .badge { font-size: 13px; font-weight: 400; color: var(--ink-2); }
+  .badge::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--ink-3); margin: 0 8px 2px 0; }
+  .badge.APPROVED::before { background: var(--ok); } .badge.REVISE::before, .badge.OBSERVATIONS_NEEDED::before, .badge.STOP::before, .badge.ESCALATE::before { background: var(--fail); }
+  .banner { margin: 24px 0 0; padding: 0 0 0 14px; border-left: 1px solid var(--fail); color: var(--ink-2); font-size: 14px; }
+  .banner code { font-family: var(--mono); font-size: 13px; }
+  .summary { display: flex; flex-wrap: wrap; gap: 8px 56px; padding: 32px 0 8px; }
+  .stat .label { color: var(--ink-3); font-size: 12px; letter-spacing: .02em; }
+  .stat .value { font-size: 28px; font-weight: 300; line-height: 1.2; letter-spacing: -.01em; }
+  .stat .value .muted { font-size: 13px; }
+  .trend { height: 28px; width: 120px; margin-top: 4px; }
+  .trend svg { width: 100%; height: 100%; overflow: visible; color: var(--ink-2); }
+  section h2 { font-size: 12px; font-weight: 400; color: var(--ink-3); letter-spacing: .02em; margin: 56px 0 16px; }
+  .film { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(440px, 1fr); gap: 48px; overflow-x: auto; padding: 0 0 12px; scroll-snap-type: x proximity; }
+  .film[data-turns="1"] { grid-auto-columns: minmax(320px, 760px); }
+  .film[data-many] { grid-auto-columns: minmax(440px, 560px); }
+  .turn { display: flex; flex-direction: column; gap: 16px; scroll-snap-align: start; padding-top: 16px; border-top: 1px solid var(--line); }
+  .turn.final { border-top-color: var(--ink); }
+  .turn .head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .turn .head .n { font-weight: 500; }
   .turn .head time { color: var(--ink-3); font-size: 12px; }
-  .shots { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start; }
-  .shot { border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: #fff; }
+  .shots { display: grid; grid-template-columns: 1fr 120px; gap: 12px; align-items: start; }
+  .shots.single { grid-template-columns: 1fr 140px; }
+  .shot { overflow: hidden; background: #fff; border: 1px solid var(--line); }
   .shot img { display: block; width: 100%; height: auto; }
-  .shot.mobile { width: 88px; }
-  .shot .cap { font-size: 11px; color: var(--ink-3); padding: 3px 6px; border-top: 1px solid var(--line); background: var(--panel); }
-  .score { display: flex; align-items: baseline; gap: 8px; }
-  .score .big { font-size: 20px; font-weight: 600; }
+  .shot.mobile { width: 120px; } .shot.mobile.wide { width: 140px; }
+  .shot .cap { font-size: 11px; color: var(--ink-3); padding: 4px 0 0; border: 0; background: none; }
+  .score { display: flex; align-items: baseline; gap: 10px; }
+  .score .big { font-size: 28px; font-weight: 300; }
   .score .delta { font-size: 12px; }
-  .delta.up { color: var(--approve); } .delta.down { color: var(--stop); } .delta.flat { color: var(--ink-3); }
-  .cats { display: grid; grid-template-columns: 52px 1fr 34px; gap: 4px 8px; align-items: center; font-size: 12px; }
-  .cats .bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
-  .cats .bar i { display: block; height: 100%; background: var(--accent); }
-  .cats .bar i.low { background: var(--revise); }
-  .fixes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-  .fixes li { font-size: 12.5px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--line); }
-  .fixes li.resolved { border-color: var(--approve); background: var(--approve-bg); }
-  .fixes li.persisted { border-color: var(--revise); background: var(--revise-bg); }
-  .fixes li .id { font-family: var(--mono); font-size: 11px; color: var(--ink-2); }
+  .delta.up { color: var(--ok); } .delta.down { color: var(--fail); } .delta.flat { color: var(--ink-3); }
+  .cats { display: grid; grid-template-columns: 56px 1fr 0; gap: 6px 12px; align-items: center; font-size: 12px; color: var(--ink-2); }
+  .cats .bar { height: 1px; background: var(--line); position: relative; }
+  .cats .bar i { display: block; height: 100%; background: var(--ink); }
+  .cats .bar i.low { background: var(--fail); }
+  .fixes { list-style: none; margin: 0; padding: 0; }
+  .fixes li { font-size: 14px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .fixes li.resolved { color: var(--ink-3); text-decoration: line-through; text-decoration-color: var(--ink-3); }
+  .fixes li.persisted .id::after { content: " · still open"; color: var(--fail); font-family: var(--sans); }
+  .fixes li .id { font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
   .fixes li .sel { font-family: var(--mono); font-size: 11px; color: var(--ink-3); word-break: break-all; }
-  .files { font-family: var(--mono); font-size: 11px; color: var(--ink-2); white-space: pre-wrap; }
-  details.why { border-top: 1px solid var(--line); padding-top: 8px; }
-  details.why summary { cursor: pointer; font-size: 12px; color: var(--ink-2); }
-  table.q { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 11.5px; margin-top: 6px; }
-  table.q td { padding: 3px 4px; border-top: 1px solid var(--line); vertical-align: top; }
-  table.q td.id { font-family: var(--mono); width: 46%; overflow-wrap: anywhere; }
-  table.q td.num { white-space: nowrap; width: 70px; }
-  .pbar { position: relative; height: 8px; background: var(--line); border-radius: 4px; min-width: 70px; }
-  .pbar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); border-radius: 4px; }
-  .pbar i.fail { background: var(--revise); }
-  .pbar b { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--ink); opacity: .6; }
-  .tag { display: inline-block; font-size: 10px; padding: 0 5px; border-radius: 3px; border: 1px solid var(--line); color: var(--ink-2); margin-left: 4px; }
-  .tag.gate { border-color: var(--stop); color: var(--stop); }
-  .tag.hidden { border-style: dashed; }
-  .tag.det { border-color: var(--escalate); color: var(--escalate); }
-  .compare { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
-  .compare .frame { position: relative; overflow: hidden; border-radius: 6px; border: 1px solid var(--line); max-width: 900px; }
+  .files { font-family: var(--mono); font-size: 11px; color: var(--ink-3); white-space: pre-wrap; }
+  details.why { border-top: 1px solid var(--line); padding-top: 10px; }
+  details.why summary { cursor: pointer; font-size: 12px; color: var(--ink-3); list-style: none; }
+  details.why summary::-webkit-details-marker { display: none; }
+  details.why summary::after { content: " ↓"; } details.why[open] summary::after { content: " ↑"; }
+  table.q { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+  table.q td { padding: 6px 0; border-top: 1px solid var(--line); vertical-align: top; color: var(--ink-2); }
+  table.q td.id { font-family: var(--mono); width: 46%; overflow-wrap: anywhere; color: var(--ink); }
+  table.q td.num { white-space: nowrap; width: 76px; text-align: right; }
+  .pbar { position: relative; height: 1px; background: var(--line); min-width: 60px; margin-top: 9px; }
+  .pbar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ink); }
+  .pbar i.fail { background: var(--fail); }
+  .pbar b { position: absolute; top: -3px; bottom: -3px; width: 1px; background: var(--ink-3); }
+  .tag { font-size: 10px; color: var(--ink-3); margin-left: 6px; letter-spacing: .04em; }
+  .tag.gate { color: var(--fail); } .tag.det { color: var(--ink-2); }
+  .compare .frame { position: relative; overflow: hidden; border: 1px solid var(--line); max-width: 900px; }
   .compare img { display: block; width: 100%; height: auto; }
-  .compare .before { position: absolute; inset: 0; width: 50%; overflow: hidden; border-right: 2px solid var(--accent); }
+  .compare .before { position: absolute; inset: 0; width: 50%; overflow: hidden; border-right: 1px solid var(--ink); }
   .compare .before img { max-width: none; }
-  .compare input[type=range] { width: 100%; margin-top: 8px; }
-  .compare .labels { display: flex; justify-content: space-between; font-size: 12px; color: var(--ink-3); }
-  .obs { font-size: 11.5px; color: var(--ink-2); display: grid; grid-template-columns: max-content 1fr; gap: 2px 8px; }
-  .obs dt { font-family: var(--mono); color: var(--ink-3); }
-  .obs dd { margin: 0; overflow-wrap: anywhere; }
-  .muted { color: var(--ink-3); }
-  .empty { color: var(--ink-3); font-style: italic; }
-  @media (max-width: 720px) { .film { grid-auto-columns: minmax(260px, 86vw); } }
+  .compare input[type=range] { width: 100%; max-width: 900px; margin-top: 12px; accent-color: var(--ink); }
+  .compare .labels { display: flex; justify-content: space-between; max-width: 900px; font-size: 12px; color: var(--ink-3); }
+  .obs { font-size: 12px; color: var(--ink-2); display: grid; grid-template-columns: max-content 1fr; gap: 3px 12px; margin-top: 8px; }
+  .obs dt { font-family: var(--mono); color: var(--ink-3); } .obs dd { margin: 0; overflow-wrap: anywhere; }
+  .muted { color: var(--ink-3); } .empty { color: var(--ink-3); }
+  @media (max-width: 720px) { .film { grid-auto-columns: minmax(260px, 88vw); gap: 24px; } .summary { gap: 8px 32px; } }
 </style>
 </head>
 <body>
@@ -108,8 +92,8 @@
 </header>
 <div id="banner"></div>
 <div class="summary" id="summary"></div>
-<section><h2>Iterations</h2><div class="film" id="film"></div></section>
 <section id="compareSection"><h2>Before and after</h2><div class="compare" id="compare"></div></section>
+<section><h2>Iterations</h2><div class="film" id="film"></div></section>
 <script id="run-data" type="application/json">/*__DATA__*/</script>
 <script>
 (function () {
@@ -142,8 +126,7 @@
     <div class="stat"><div class="label">Verdict</div><div class="value">${esc(last ? verdictOf(last).replace("_", " ") : "—")}</div></div>
     <div class="stat"><div class="label">Score</div><div class="value num">${last ? pct(last.decision ? last.decision.overall : last.overall) : "—"}<span class="muted" style="font-size:13px"> / best ${pct(best)}</span></div>
       <div class="trend"><svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><path d="${path}" fill="none" stroke="currentColor" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg></div></div>
-    <div class="stat"><div class="label">Iterations</div><div class="value num">${turns.length}</div></div>
-    <div class="stat"><div class="label">Judge cost</div><div class="value num">$${cost.toFixed(4)}</div></div>`;
+    <div class="stat"><div class="label">&nbsp;</div><div class="muted" style="font-size:12px;margin-top:10px">${turns.length} turns · ${cost.toFixed(4)}</div></div>`;
 
   // Filmstrip
   const film = $("#film"); film.dataset.turns = String(turns.length); if (turns.length > 3) film.dataset.many = "1";
@@ -159,7 +142,7 @@
     const resolved = [...sentPrev].filter((id) => !fixes.includes(id));
     const fixesHtml = (d.fixes || []).map((f) => `<li class="${sentPrev.has(f.id) ? "persisted" : ""}"><span class="id">${esc(f.id)}</span>${f.source === "deterministic" ? '<span class="tag det">measured</span>' : ""}<br>${esc(f.text)}${f.selectors && f.selectors.length ? `<br><span class="sel">${esc(f.selectors.join(", "))}</span>` : ""}</li>`).join("")
       + resolved.map((id) => `<li class="resolved"><span class="id">${esc(id)}</span> resolved</li>`).join("");
-    const cats = CATS.map((c) => { const val = d.categories ? d.categories[c] : (t.categories || {})[c]; return `<span>${c}</span><div class="bar"><i class="${(val || 0) < 0.6 ? "low" : ""}" style="width:${pct(val)}%"></i></div><span class="num" style="text-align:right">${val == null ? "–" : pct(val)}</span>`; }).join("");
+    const cats = CATS.map((c) => { const val = d.categories ? d.categories[c] : (t.categories || {})[c]; return `<span>${c}</span><div class="bar"><i class="${(val || 0) < 0.6 ? "low" : ""}" style="width:${pct(val)}%"></i></div><span></span>`; }).join("");
     const files = (t.filesChanged || []).length ? `<div class="files">${esc(t.filesChanged.slice(0, 12).join("\n"))}${t.filesChanged.length > 12 ? `\n… +${t.filesChanged.length - 12}` : ""}</div>` : `<div class="muted" style="font-size:12px">no file changes recorded</div>`;
     // Why panel
     const rows = [], passing = [];
@@ -176,8 +159,7 @@
         <div class="shots ${turns.length <= 2 ? "single" : ""}">${desktop ? `<div class="shot"><img src="${esc(rel(desktop.path))}" alt="desktop screenshot turn ${i + 1}"><div class="cap">${esc(desktop.key)}</div></div>` : ""}${mobile ? `<div class="shot mobile ${turns.length <= 2 ? "wide" : ""}"><img src="${esc(rel(mobile.path))}" alt="mobile screenshot turn ${i + 1}"><div class="cap">mobile</div></div>` : ""}</div>
         <div class="score"><span class="big num">${pct(overall)}</span>${delta === null ? "" : `<span class="delta num ${delta > 0.005 ? "up" : delta < -0.005 ? "down" : "flat"}">${delta > 0 ? "+" : ""}${Math.round(delta * 100)}</span>`}${d.reason ? `<span class="muted" style="font-size:12px">${esc(d.reason)}</span>` : ""}</div>
         <div class="cats">${cats}</div>
-        ${fixesHtml ? `<ul class="fixes">${fixesHtml}</ul>` : `<div class="muted" style="font-size:12px">no fixes sent</div>`}
-        ${files}
+        ${fixesHtml ? `<details class="why"><summary>${(d.fixes || []).length} fixes${resolved.length ? ` · ${resolved.length} resolved` : ""}</summary><ul class="fixes">${fixesHtml}</ul>${files}</details>` : `<div class="muted" style="font-size:12px">no fixes</div>`}
         <details class="why"><summary>Why · ${checkCount} checks, ${rows.length - (passing.length ? 1 : 0)} failing</summary><table class="q">${rows.join("")}</table>${obs}</details>
       </article>`);
   });
