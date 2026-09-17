@@ -9,6 +9,13 @@ import type { Config, DomSnapshot, ElementRecord, Viewport } from "../types.js";
 const RETRY_DELAY_MS = 500;
 const CAPTURE_TIMEOUT_MS = 15_000;
 
+/** A dev-server command that starts with `design-gate` runs this same CLI, even when it is not on PATH. */
+const resolveServerCommand = (command: string): string => {
+  const entry = process.argv[1];
+  if (!entry || !/^design-gate(\s|$)/.test(command.trim())) return command;
+  return command.trim().replace(/^design-gate/, `${JSON.stringify(process.execPath)} ${JSON.stringify(entry)}`);
+};
+
 export class DevServerUnreachableError extends Error {
   readonly url: string;
 
@@ -70,7 +77,7 @@ export const ensureDevServer = async (
   if (!autoStart || !command) throw new DevServerUnreachableError(url);
 
   opts.log?.(`Starting dev server: ${command}`);
-  const child = spawn(command, {
+  const child = spawn(resolveServerCommand(command), {
     shell: true,
     detached: false,
     env: process.env,

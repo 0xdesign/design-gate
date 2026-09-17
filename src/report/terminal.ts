@@ -16,7 +16,9 @@ export const renderVerdictLine = (verdict: Verdict, n: number, reason?: string):
 
 export const renderHuman = (json: CheckJson): string => {
   const lines = [
-    `${json.verdict.replaceAll("_", " ")} · score ${percent(json.overall)} · best ${percent(json.best)} · turn ${json.turn}`,
+    json.notes.includes("KEY NEEDED")
+      ? `${json.verdict.replaceAll("_", " ")} · measured checks only (no TypeSafe key; run \`design-gate login\`) · turn ${json.turn}`
+      : `${json.verdict.replaceAll("_", " ")} · score ${percent(json.overall)} · best ${percent(json.best)} · turn ${json.turn}`,
   ];
   if (json.hardFailures.length > 0) {
     lines.push("Hard failures:");

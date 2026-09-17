@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { realpathSync } from "node:fs";
 import { Command, CommanderError, InvalidArgumentError } from "commander";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -113,4 +114,12 @@ export const main = async (argv = process.argv): Promise<void> => {
   }
 };
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) void main();
+const isEntryPoint = (): boolean => {
+  if (!process.argv[1]) return false;
+  try {
+    return realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+};
+if (isEntryPoint()) void main();
