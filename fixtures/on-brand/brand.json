@@ -1,0 +1,21 @@
+{
+  "name": "Mnemo",
+  "intent": "expressive",
+  "palette": [
+    { "token": "obsidian", "hex": "#0b0d0c", "role": "background" },
+    { "token": "bone", "hex": "#ece9e2", "role": "text" },
+    { "token": "phosphor", "hex": "#5dff9f", "role": "accent" },
+    { "token": "muted", "hex": "#8a8f8b", "role": "muted" },
+    { "token": "surface", "hex": "#141716", "role": "surface" }
+  ],
+  "type": [
+    { "family": "Fraunces", "role": "display" },
+    { "family": "Schibsted Grotesk", "role": "body" },
+    { "family": "IBM Plex Mono", "role": "mono" }
+  ],
+  "radius": { "base": 6, "scale": [4, 6, 12] },
+  "spacing": { "base": 4, "scale": [4, 8, 12, 16, 24, 32, 48, 64] },
+  "voice": ["direct", "calm", "precise"],
+  "forbidden": ["wallet", "token", "mint"],
+  "darkMode": true
+}

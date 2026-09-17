@@ -1,0 +1,8 @@
+[
+  { "id": "generic-saas-home", "url": "fixtures/generic-saas/index.html", "brandFile": "fixtures/generic-saas/brand.json",
+    "labels": { "brand.palette_fit": false, "brand.type_fit": false, "brand.forbidden_vocabulary": false, "craft.anti_generic": false, "ux.primary_action_clear": true, "a11y.color_only_meaning": true },
+    "overall": 1, "notes": "deliberately generic AI template, off-brand, fails accessibility gates" },
+  { "id": "on-brand-home", "url": "fixtures/on-brand/index.html", "brandFile": "fixtures/on-brand/brand.json",
+    "labels": { "brand.palette_fit": true, "brand.type_fit": true, "brand.forbidden_vocabulary": true, "craft.anti_generic": true, "ux.primary_action_clear": true, "a11y.color_only_meaning": true },
+    "overall": 4, "notes": "same content restyled to the Mnemo brand; should approve" }
+]

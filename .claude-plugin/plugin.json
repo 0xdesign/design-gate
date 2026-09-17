@@ -1,0 +1,10 @@
+{
+  "name": "design-gate",
+  "description": "Jev-powered design approval loop: the agent renders, measures, judges and fixes UI until the gate approves.",
+  "version": "0.1.0",
+  "author": { "name": "0xdesigner" },
+  "homepage": "https://github.com/0xdesign/design-gate",
+  "repository": "https://github.com/0xdesign/design-gate",
+  "keywords": ["design", "ui", "frontend", "review", "quality-gate", "jev", "typesafe"],
+  "license": "MIT"
+}

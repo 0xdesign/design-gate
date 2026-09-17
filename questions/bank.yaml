@@ -1,0 +1,770 @@
+# design-gate question bank v1
+# Every question is atomic, names the state fields it reads, and carries the fix the agent receives when it fails.
+# Types: noul (yes/no → probability), score (ordered levels → normalized 0..1), choice (one label).
+# Gates must pass; everything else rolls into the weighted composite. hidden questions never emit fixes.
+# State paths available: brief.{route,viewport,screen_type} brand.{name,intent,palette[],type[],radius,spacing,voice[],forbidden[],darkMode}
+#   facts.color.{palette_size,off_token_share,off_token_examples[],contrast_fails}
+#   facts.type.{families[],off_brand_families[],distinct_sizes,scale_is_regular,min_body_px,longest_line_chars}
+#   facts.space.{grid_px,off_grid_share,distinct_gaps}  facts.shape.{radii_distinct,shadows_distinct}
+#   facts.a11y.{small_targets,focus_visible_missing,axe_serious,heading_outline,landmarks[]}
+#   facts.motion.{durations,reduced_motion_respected}  facts.density.{ctas_above_fold,above_fold,horizontal_overflow}
+#   cross_screen.{button_signatures,radii_union,palette_union,font_family_union}
+#   observations.{screen_type,focal_point,hierarchy_levels,reading_order,status_encoding,patterns_present[],generic_traits[],copy.{headline,primary_cta,empty_state},mood[]}
+version: 1
+questions:
+
+  # ───────────────────────────── brand ─────────────────────────────
+  - id: brand.palette_fit
+    category: brand
+    type: noul
+    weight: 3
+    gate: true
+    threshold: 0.5
+    needs: [facts, brand]
+    instructions: >-
+      Answer true if the screen's colors come from the brand palette. Read facts.color.off_token_share and
+      facts.color.off_token_examples. True when off_token_share is "none" or "few", or when every hex in
+      off_token_examples is a lighter or darker shade of a hex in brand.palette or a neutral gray.
+      False when off_token_share is "some" or "most" and the examples introduce hues that are not in brand.palette.
+    criteria:
+      true: off_token_share is none or few; any off-token examples are shades of brand.palette hexes or neutral grays
+      false: off_token_share is some or most, and off_token_examples contain hues absent from brand.palette
+    fix: >-
+      Replace the hard-coded colors listed under facts.color.off_token_examples (selectors given) with brand.palette tokens.
+      Do not introduce hues that are not in brand.palette; use tints or shades of existing tokens instead.
+    refs: ["DESIGN_PRINCIPLES.md#Part 2: Color"]
+
+  - id: brand.type_fit
+    category: brand
+    type: noul
+    weight: 3
+    gate: true
+    threshold: 0.5
+    needs: [facts, brand]
+    instructions: >-
+      Answer true if the screen uses the brand typefaces. Read facts.type.families, facts.type.off_brand_families and
+      brand.type. True when off_brand_families is empty, or when it contains only generic fallback names
+      (serif, sans-serif, monospace, system-ui, ui-sans-serif) while families includes a family from brand.type.
+      False when a family listed in off_brand_families is a real typeface (for example Inter, Roboto, Arial, Helvetica)
+      that is not in brand.type.
+    criteria:
+      true: off_brand_families is empty or contains only generic fallback names, and a brand.type family is present
+      false: a real non-brand typeface appears in off_brand_families, or no brand.type family is present in families
+    fix: >-
+      Load and apply the typefaces in brand.type (display for headlines, body for text). Remove the families listed under
+      facts.type.off_brand_families from the stylesheet.
+    refs: ["DESIGN_PRINCIPLES.md#Part 2: Typography"]
+
+  - id: brand.mood_fit
+    category: brand
+    type: score
+    weight: 2
+    threshold: 0.5
+    needs: [observations, brand]
+    instructions: >-
+      Compare observations.mood and the wording in observations.copy against brand.voice and brand.intent.
+      Rate how well the screen's mood matches the brand.
+    criteria:
+      - summary: contradicts the brand
+        signals: ["observations.mood contains 'generic', or contains a mood opposite to brand.voice (for example playful when voice is clinical)"]
+      - summary: neutral, could be any brand
+        signals: ["observations.mood does not contradict brand.voice but shares no adjective with it", "copy reads as template marketing"]
+      - summary: clearly this brand
+        signals: ["at least one observations.mood adjective matches or closely paraphrases a brand.voice adjective", "copy tone matches brand.voice"]
+    fix: >-
+      Move the screen's tone toward brand.voice: choose one or two adjectives from brand.voice and let them drive the
+      headline wording, image choice, and color emphasis. Remove anything that reads as generic marketing.
+    refs: ["frontend-design skill: ground designs in the subject matter"]
+
+  - id: brand.forbidden_vocabulary
+    category: brand
+    type: noul
+    weight: 2
+    gate: true
+    bad_if_true: true
+    threshold: 0.5
+    needs: [observations, brand]
+    instructions: >-
+      Answer true if any word listed in brand.forbidden appears (in any letter case, singular or plural) in
+      observations.copy.headline, observations.copy.primary_cta, or observations.copy.empty_state. Answer false if
+      brand.forbidden is empty or none of its words appear.
+    criteria:
+      true: a brand.forbidden word appears in the copy fields
+      false: brand.forbidden is empty or no listed word appears
+    fix: >-
+      Remove the brand.forbidden words from the headline, primary action and empty-state copy and replace them with the
+      brand's own vocabulary (see brand.voice).
+    refs: ["DESIGN_PRINCIPLES.md#Part 8: Content & Copy"]
+
+  - id: brand.distinctiveness
+    category: brand
+    type: score
+    weight: 2
+    hidden: true
+    threshold: 0.5
+    needs: [observations, brand]
+    instructions: >-
+      Given brand.intent, observations.generic_traits and observations.mood, rate how distinctive the screen is:
+      whether it could only belong to brand.name or could be any product.
+    criteria:
+      - summary: interchangeable template
+        signals: ["observations.generic_traits has two or more entries", "observations.mood contains 'generic'"]
+      - summary: competent but anonymous
+        signals: ["at most one generic trait", "mood is plausible for the brand but not specific"]
+      - summary: unmistakably this brand
+        signals: ["no generic traits", "mood matches brand.voice", "a single memorable move is visible"]
+    refs: ["frontend-design skill: restraint and self-critique"]
+
+  # ───────────────────────────── craft ─────────────────────────────
+  - id: craft.anti_generic
+    category: craft
+    type: noul
+    weight: 3
+    gate: true
+    bad_if_true: true
+    threshold: 0.35
+    applies_to: [conventional, expressive]
+    needs: [observations, facts]
+    instructions: >-
+      Answer true if the screen reads as a stock AI-generated template. Read observations.generic_traits,
+      facts.shape.radii_distinct and facts.shape.shadows_distinct. True when generic_traits has two or more entries,
+      or when generic_traits contains "saas_card_kit" and radii_distinct is "1". False when generic_traits has zero
+      or one entry and the screen shows a deliberate choice in observations.mood or facts.type.families.
+    criteria:
+      true: two or more generic_traits, or saas_card_kit together with a single radius everywhere
+      false: zero or one generic trait, plus a distinctive mood or typeface choice
+    fix: >-
+      Remove the template tells listed under observations.generic_traits (all-caps eyebrow labels, arrows on buttons,
+      three identical feature cards, gradient blobs, nested cards, numbered decoration). Replace them with one deliberate
+      move that comes from brand.voice, and keep everything else quiet.
+    refs: ["frontend-design skill: calibration list of generated-page traits"]
+
+  - id: craft.hierarchy
+    category: craft
+    type: score
+    weight: 3
+    threshold: 0.5
+    needs: [observations, facts]
+    instructions: >-
+      Judge visual hierarchy from observations.focal_point, observations.hierarchy_levels, observations.reading_order
+      and facts.density.ctas_above_fold.
+    criteria:
+      - summary: flat, no dominant element
+        signals: ["focal_point is none_clear", "hierarchy_levels is 1", "ctas_above_fold is 3+"]
+      - summary: a focal point exists but competes
+        signals: ["reading_order is ambiguous", "ctas_above_fold is 2", "hierarchy_levels is 4+"]
+      - summary: one focal point, two or three levels, one primary action
+        signals: ["focal_point is not none_clear", "hierarchy_levels is 2 or 3", "reading_order is clear", "ctas_above_fold is 1"]
+    fix: >-
+      Make one element unmistakably primary: keep a single primary call to action above the fold, demote the other
+      actions to secondary or text buttons, and widen the size and weight gap between the headline and body text.
+    refs: ["DESIGN_PRINCIPLES.md#Part 2: Typography", "Nielsen #8 aesthetic and minimalist design"]
+
+  - id: craft.type_scale
+    category: craft
+    type: score
+    weight: 2
+    threshold: 0.5
+    needs: [facts]
+    instructions: >-
+      Judge typographic discipline from facts.type.distinct_sizes, facts.type.scale_is_regular, facts.type.min_body_px
+      and facts.type.longest_line_chars.
+    criteria:
+      - summary: undisciplined
+        signals: ["distinct_sizes is 9+", "scale_is_regular is false", "min_body_px is <14", "longest_line_chars is 91+"]
+      - summary: mostly disciplined with one weakness
+        signals: ["exactly one of: distinct_sizes 5-8 with irregular scale, min_body_px 14-15, longest_line_chars 76-90 or <45"]
+      - summary: disciplined
+        signals: ["distinct_sizes is 1-4 or 5-8", "scale_is_regular is true", "min_body_px is 16+", "longest_line_chars is 45-75"]
+    fix: >-
+      Set a regular type scale with at most six sizes, body text at 16px or larger, and measure between 45 and 75
+      characters per line (cap text blocks at about 65ch).
+    refs: ["DESIGN_PRINCIPLES.md#Part 2: Typography"]
+
+  - id: craft.spacing_rhythm
+    category: craft
+    type: noul
+    weight: 2
+    threshold: 0.5
+    needs: [facts]
+    instructions: >-
+      Answer true if spacing follows a consistent grid. Read facts.space.off_grid_share and facts.space.distinct_gaps.
+      True when off_grid_share is "none" or "few" and distinct_gaps is "1-4" or "5-8". False otherwise.
+    criteria:
+      true: off_grid_share none or few, and distinct_gaps 1-4 or 5-8
+      false: off_grid_share some or most, or distinct_gaps 9+
+    fix: >-
+      Snap every padding, margin and gap to the brand spacing scale (multiples of facts.space.grid_px) and reduce the
+      number of distinct gap values to six or fewer.
+    refs: ["DESIGN_PRINCIPLES.md#Part 2: Spacing System"]
+
+  - id: craft.shape_consistency
+    category: craft
+    type: noul
+    weight: 2
+    threshold: 0.5
+    needs: [facts]
+    instructions: >-
+      Answer true if corners and elevation are consistent. Read facts.shape.radii_distinct and
+      facts.shape.shadows_distinct. True when radii_distinct is "0", "1" or "2-3" and shadows_distinct is "0", "1"
+      or "2-3". False when either is "4+".
+    criteria:
+      true: at most three distinct radii and at most three distinct shadows
+      false: four or more distinct radii, or four or more distinct shadows
+    fix: >-
+      Use at most two corner radii (small for controls, large for containers) drawn from brand.radius.scale and a single
+      elevation shadow for floating surfaces.
+    refs: ["DESIGN_PRINCIPLES.md#Part 2: Border Radius", "DESIGN_PRINCIPLES.md#Part 2: Shadows & Elevation"]
+
+  - id: craft.color_restraint
+    category: craft
+    type: score
+    weight: 2
+    threshold: 0.5
+    needs: [facts, brand]
+    instructions: >-
+      Judge color restraint from facts.color.palette_size and facts.color.off_token_share, considering that
+      brand.palette defines the allowed colors.
+    criteria:
+      - summary: sprawling palette
+        signals: ["palette_size is 11+", "off_token_share is most"]
+      - summary: acceptable but loose
+        signals: ["palette_size is 7-10", "off_token_share is some"]
+      - summary: restrained and on-token
+        signals: ["palette_size is 1-3 or 4-6", "off_token_share is none or few"]
+    fix: >-
+      Cut the number of colors in use to the brand palette plus one accent, and express emphasis through weight and
+      spacing rather than additional hues.
+    refs: ["DESIGN_PRINCIPLES.md#Part 2: Color"]
+
+  - id: craft.density
+    category: craft
+    type: score
+    weight: 1
+    threshold: 0.5
+    needs: [facts, observations]
+    instructions: >-
+      Judge whether the amount of content above the fold suits the screen. Read facts.density.above_fold and
+      observations.screen_type. Landing, auth and form screens should be sparse or moderate; dashboard, list and table
+      screens may be moderate or dense.
+    criteria:
+      - summary: wrong density for the screen type
+        signals: ["landing/auth/form with above_fold dense", "dashboard/list with above_fold sparse"]
+      - summary: acceptable
+        signals: ["above_fold moderate for any screen type"]
+      - summary: well matched
+        signals: ["landing/auth/form with sparse", "dashboard/list/detail with moderate or dense"]
+    fix: >-
+      Adjust the above-the-fold density to the screen's job: fewer, larger elements for landing and forms; tighter,
+      scannable rows for dashboards and lists.
+    refs: ["DESIGN_PRINCIPLES.md#Part 1: Cognitive Load Principles"]
+
+  - id: craft.motion_restraint
+    category: craft
+    type: noul
+    weight: 1
+    threshold: 0.5
+    needs: [facts]
+    instructions: >-
+      Answer true if motion is restrained and accessible. Read facts.motion.durations and
+      facts.motion.reduced_motion_respected. True when durations is "none", "<150" or "150-400" and
+      reduced_motion_respected is true. False when durations is "400+" or reduced_motion_respected is false.
+    criteria:
+      true: durations at most 150-400 and reduced motion respected
+      false: durations 400+ or reduced motion not respected
+    fix: >-
+      Keep transitions between 150 and 400 ms, animate only transform and opacity, remove bounce easing, and add a
+      prefers-reduced-motion rule that disables non-essential motion.
+    refs: ["DESIGN_PRINCIPLES.md#Part 5: Motion & Animation", "DESIGN_PRINCIPLES.md#Part 5: Reduced Motion"]
+
+  - id: craft.cross_screen_consistency
+    category: craft
+    type: noul
+    weight: 2
+    threshold: 0.5
+    needs: [facts]
+    instructions: >-
+      Answer true if the screens in this run look like one product. Read cross_screen.button_signatures,
+      cross_screen.radii_union and cross_screen.font_family_union. True when each of them is "0", "1" or "2-3".
+      False when any of them is "4+". If cross_screen is absent, answer true.
+    criteria:
+      true: button styles, radii and font families are consistent across screens (each at most 2-3)
+      false: buttons, radii or font families vary widely across screens (any 4+)
+    fix: >-
+      Define one button component (background, radius, height) and one radius scale, and reuse them on every screen;
+      remove per-page overrides.
+    refs: ["DESIGN_PRINCIPLES.md#Part 3: Buttons", "Nielsen #4 consistency and standards"]
+
+  - id: craft.card_abuse
+    category: craft
+    type: noul
+    weight: 2
+    bad_if_true: true
+    threshold: 0.5
+    needs: [observations, facts]
+    instructions: >-
+      Answer true if the layout relies on cards for everything. Read observations.generic_traits and
+      facts.shape.radii_distinct. True when generic_traits contains "saas_card_kit" or "three_col_features" and
+      radii_distinct is "1". False otherwise.
+    criteria:
+      true: saas_card_kit or three_col_features present with a single radius everywhere
+      false: content is grouped by spacing and type, or cards are used selectively
+    fix: >-
+      Remove nested and decorative cards. Group content with spacing, alignment and typographic contrast; reserve cards
+      for genuinely separable, interactive objects.
+    refs: ["DESIGN_PRINCIPLES.md#Part 3: Cards"]
+
+  - id: craft.eyebrow_decoration
+    category: craft
+    type: noul
+    weight: 1
+    bad_if_true: true
+    threshold: 0.5
+    needs: [observations]
+    instructions: >-
+      Answer true if the screen uses decorative structural devices. Read observations.generic_traits. True when it
+      contains "allcaps_eyebrow", "numbered_steps_decoration", "middle_dot_meta" or "single_word_accent_headline".
+      False otherwise.
+    criteria:
+      true: any of allcaps_eyebrow, numbered_steps_decoration, middle_dot_meta, single_word_accent_headline present
+      false: none present
+    fix: >-
+      Remove all-caps eyebrow labels, decorative numbering, middle-dot meta strings and single accented words in
+      headlines. Keep a structural device only when it encodes real information (a true sequence, a real category).
+    refs: ["frontend-design skill: visual structure is information"]
+
+  - id: craft.hero_specificity
+    category: craft
+    type: score
+    weight: 2
+    threshold: 0.5
+    needs: [observations, brand]
+    instructions: >-
+      Only meaningful when observations.screen_type is "landing"; for other screen types choose the top level.
+      Judge whether the hero opens with something specific to brand.name and its subject, using observations.focal_point,
+      observations.copy.headline and observations.generic_traits.
+    criteria:
+      - summary: generic hero
+        signals: ["generic_traits contains gradient_blob or three_col_features", "headline could describe any product"]
+      - summary: adequate hero
+        signals: ["headline names the product category", "focal_point is headline or image without a subject-specific choice"]
+      - summary: specific hero
+        signals: ["headline makes a concrete claim about the subject", "focal_point is a subject-specific image, demo or interactive moment"]
+    fix: >-
+      Open the hero with the most characteristic thing in the product's world (a concrete headline, a real screenshot,
+      a live demo) instead of a gradient backdrop and a generic claim.
+    refs: ["frontend-design skill: design principles (hero)"]
+
+  - id: craft.focal_restraint
+    category: craft
+    type: noul
+    weight: 1
+    hidden: true
+    threshold: 0.5
+    needs: [observations]
+    instructions: >-
+      Answer true if the screen spends its boldness in one place. Read observations.focal_point and
+      observations.hierarchy_levels. True when focal_point is not "none_clear" and hierarchy_levels is "2" or "3".
+    criteria:
+      true: one clear focal point with two or three hierarchy levels
+      false: no clear focal point, or four or more competing levels
+    refs: ["frontend-design skill: spend your boldness in one place"]
+
+  # ───────────────────────────── ux ─────────────────────────────
+  - id: ux.primary_action_clear
+    category: ux
+    type: noul
+    weight: 3
+    gate: true
+    threshold: 0.5
+    needs: [facts, observations]
+    instructions: >-
+      Answer true if a person can tell what to do next. Read facts.density.ctas_above_fold, observations.focal_point
+      and observations.copy.primary_cta. True when ctas_above_fold is "1" or "2", primary_cta is not empty, and
+      focal_point is not "none_clear". False when ctas_above_fold is "0" or "3+", or primary_cta is empty.
+    criteria:
+      true: one or two calls to action above the fold, a named primary action, and a clear focal point
+      false: no call to action, three or more competing calls to action, or no primary action label
+    fix: >-
+      Show exactly one primary action above the fold with a specific label (verb plus outcome), and reduce the other
+      calls to action to secondary styling.
+    refs: ["Nielsen #6 recognition rather than recall", "DESIGN_PRINCIPLES.md#Part 3: Buttons"]
+
+  - id: ux.minimalist
+    category: ux
+    type: score
+    weight: 2
+    threshold: 0.5
+    needs: [observations, facts]
+    instructions: >-
+      Judge aesthetic and minimalist design. Read facts.density.above_fold, observations.hierarchy_levels and
+      facts.density.ctas_above_fold.
+    criteria:
+      - summary: cluttered
+        signals: ["above_fold dense", "hierarchy_levels 4+", "ctas_above_fold 3+"]
+      - summary: busy but usable
+        signals: ["above_fold moderate with hierarchy_levels 3", "ctas_above_fold 2"]
+      - summary: focused
+        signals: ["above_fold sparse or moderate", "hierarchy_levels 2 or 3", "ctas_above_fold 1"]
+    fix: >-
+      Remove every element that does not serve the screen's primary job; merge secondary information into fewer groups
+      and cut competing calls to action.
+    refs: ["Nielsen #8 aesthetic and minimalist design"]
+
+  - id: ux.mobile_fit
+    category: ux
+    type: noul
+    weight: 2
+    threshold: 0.5
+    needs: [facts]
+    instructions: >-
+      Answer true if the screen works on a phone. Read brief.viewport, facts.density.horizontal_overflow and
+      facts.a11y.small_targets. If brief.viewport is "desktop", answer true. If brief.viewport is "mobile", true when
+      horizontal_overflow is false and small_targets is "0". False otherwise.
+    criteria:
+      true: desktop viewport, or mobile viewport with no horizontal overflow and no small targets
+      false: mobile viewport with horizontal overflow or small tap targets
+    fix: >-
+      Make the mobile layout fit the viewport width (no horizontal scroll) and enlarge every tap target to at least
+      44 by 44 px.
+    refs: ["DESIGN_PRINCIPLES.md#Part 4: Touch & Pointer Interactions", "DESIGN_PRINCIPLES.md#Part 9: Mobile Issues"]
+
+  - id: ux.wayfinding
+    category: ux
+    type: noul
+    weight: 2
+    threshold: 0.5
+    needs: [observations]
+    instructions: >-
+      Answer true if the screen tells people where they are and how to move. Read observations.screen_type and
+      observations.patterns_present. For dashboard, list, detail and settings screens, true when patterns_present
+      contains "sidebar_nav" or "top_nav" or "tabs" or "breadcrumbs". For landing screens, true when it contains
+      "top_nav" or "footer". For auth screens, answer true. False otherwise.
+    criteria:
+      true: navigation appropriate to the screen type is present
+      false: an app screen has no navigation, or a landing page has neither a top nav nor a footer
+    fix: >-
+      Add the navigation this screen type expects (persistent top or side navigation for app screens, a top nav and
+      footer for marketing pages) and show the current location.
+    refs: ["DESIGN_PRINCIPLES.md#Part 3: Navigation", "Nielsen #1 visibility of system status"]
+
+  - id: ux.form_guidance
+    category: ux
+    type: noul
+    weight: 2
+    threshold: 0.5
+    needs: [observations]
+    instructions: >-
+      Only meaningful when observations.screen_type is "form" or "auth"; for other screen types answer true.
+      Read observations.patterns_present and observations.copy.primary_cta. True when patterns_present contains
+      "inline_validation" and primary_cta is not empty. False otherwise.
+    criteria:
+      true: form or auth screen with inline validation and a named submit action, or a non-form screen
+      false: form or auth screen without inline validation or without a named submit action
+    fix: >-
+      Validate fields on blur with the message next to the field, keep labels visible (never placeholder-only), and
+      name the submit button after the outcome ("Create account", not "Submit").
+    refs: ["DESIGN_PRINCIPLES.md#Part 3: Forms", "Nielsen #9 help users recognize, diagnose, and recover from errors"]
+
+  - id: ux.progress_visibility
+    category: ux
+    type: noul
+    weight: 1
+    threshold: 0.5
+    needs: [observations]
+    instructions: >-
+      Answer true if multi-step flows show progress. Read observations.patterns_present. If it contains "onboarding"
+      or "stepper", true only when it also contains "progress" or "stepper". If it contains neither "onboarding" nor
+      "stepper", answer true.
+    criteria:
+      true: no multi-step flow, or a multi-step flow with a visible stepper or progress indicator
+      false: an onboarding flow without a stepper or progress indicator
+    fix: Add a stepper or progress indicator showing step N of M to the multi-step flow.
+    refs: ["Nielsen #1 visibility of system status"]
+
+  # ───────────────────────────── pattern ─────────────────────────────
+  - id: pattern.biggest_gap
+    category: pattern
+    type: choice
+    weight: 2
+    threshold: 0.5
+    pass_choices: [none]
+    needs: [observations]
+    instructions: >-
+      Given observations.screen_type and observations.patterns_present, pick the single most important pattern that is
+      missing for this kind of screen. Pick "none" when the expected patterns are present.
+    criteria:
+      none:
+        what: the patterns world-class apps use for this screen_type are present
+      empty_state:
+        what: screen_type is list or dashboard and patterns_present lacks empty_state
+        not_for: landing, auth, form
+      inline_validation:
+        what: screen_type is form or auth and patterns_present lacks inline_validation
+        not_for: screens with no inputs
+      search_or_filters:
+        what: screen_type is list or dashboard with a table or card_grid but no search and no filters
+        not_for: screens with fewer than a handful of items
+      skeleton_or_loading:
+        what: screen_type is dashboard or detail with data and patterns_present lacks skeleton
+        not_for: static marketing pages
+      pricing_faq:
+        what: patterns_present contains pricing_table but lacks faq_accordion
+        not_for: screens without pricing
+      footer:
+        what: screen_type is landing and patterns_present lacks footer
+        not_for: app screens
+    fix_by_choice:
+      empty_state: "Design the empty state: one line explaining what will appear here plus the primary action to create it."
+      inline_validation: "Add inline validation on blur with the message adjacent to the field and a summary near the submit button."
+      search_or_filters: "Add search and the two or three filters people use most, above the list or table."
+      skeleton_or_loading: "Add skeleton placeholders that match the final layout while data loads."
+      pricing_faq: "Add a short FAQ below the pricing table answering billing, cancellation and upgrade questions."
+      footer: "Add a footer with product links, legal links and contact."
+    refs: ["DESIGN_PRINCIPLES.md#Part 4: State Handling", "DESIGN_PRINCIPLES.md#Part 10: Design System References"]
+
+  - id: pattern.screen_conventions
+    category: pattern
+    type: score
+    weight: 2
+    threshold: 0.5
+    needs: [observations]
+    instructions: >-
+      Compare observations.patterns_present with what world-class apps ship for observations.screen_type.
+      Expected cores: landing → hero, top_nav, footer; dashboard → top_nav or sidebar_nav, table or card_grid, filters;
+      list → search, filters, pagination or table; form/auth → form, inline_validation; settings → sidebar_nav or tabs,
+      form; detail → breadcrumbs or top_nav, tabs or table.
+    criteria:
+      - summary: core patterns missing
+        signals: ["two or more of the expected core patterns for the screen_type are absent"]
+      - summary: core present
+        signals: ["all but one core pattern present", "no supporting patterns"]
+      - summary: core and supporting patterns present
+        signals: ["every core pattern present", "at least one supporting pattern such as empty_state, skeleton, toast, faq_accordion, pagination"]
+    fix: >-
+      Add the core patterns expected for this screen type (see the list in the question) before adding anything novel;
+      then add one supporting state pattern (empty, loading, or feedback).
+    refs: ["DESIGN_PRINCIPLES.md#Part 3: Component Patterns"]
+
+  - id: pattern.status_feedback
+    category: pattern
+    type: noul
+    weight: 1
+    threshold: 0.5
+    needs: [observations]
+    instructions: >-
+      Answer true if the screen has a way to confirm actions. Read observations.screen_type and
+      observations.patterns_present. For form, auth, settings and dashboard screens, true when patterns_present contains
+      "toast" or "inline_validation" or "progress" or "modal". For landing, list and detail screens, answer true.
+    criteria:
+      true: an action-bearing screen has a feedback pattern, or the screen has no actions to confirm
+      false: a form, auth, settings or dashboard screen shows no feedback pattern
+    fix: >-
+      Add feedback for actions: inline confirmation next to the control for local changes, a toast for background
+      results, and a progress indicator for anything longer than a second.
+    refs: ["DESIGN_PRINCIPLES.md#Part 4: Feedback Patterns", "Nielsen #1 visibility of system status"]
+
+  - id: pattern.landing_footer
+    category: pattern
+    type: noul
+    weight: 1
+    hidden: true
+    threshold: 0.5
+    needs: [observations]
+    instructions: >-
+      Answer true if observations.screen_type is not "landing", or if it is "landing" and observations.patterns_present
+      contains "footer".
+    criteria:
+      true: not a landing page, or a landing page with a footer
+      false: a landing page without a footer
+
+  # ───────────────────────────── a11y ─────────────────────────────
+  - id: a11y.color_only_meaning
+    category: a11y
+    type: noul
+    weight: 3
+    gate: true
+    bad_if_true: true
+    threshold: 0.5
+    needs: [observations]
+    instructions: >-
+      Answer true if status or meaning is conveyed by color alone. Read observations.status_encoding. True when it is
+      "color_only". False when it is "color_plus_icon", "color_plus_text" or "na".
+    criteria:
+      true: status_encoding is color_only
+      false: status has an icon or text label, or no status is shown
+    fix: Pair every color-coded status with an icon or a text label so it is legible without color.
+    refs: ["WCAG 1.4.1 Use of Color", "DESIGN_PRINCIPLES.md#Part 6: WCAG Quick Reference"]
+
+  - id: a11y.readability
+    category: a11y
+    type: score
+    weight: 2
+    threshold: 0.5
+    needs: [facts]
+    instructions: >-
+      Judge text readability from facts.color.contrast_fails, facts.type.min_body_px and
+      facts.type.longest_line_chars.
+    criteria:
+      - summary: hard to read
+        signals: ["contrast_fails is 3-5 or 6+", "min_body_px is <14", "longest_line_chars is 91+"]
+      - summary: readable with issues
+        signals: ["contrast_fails is 1-2", "min_body_px is 14-15", "longest_line_chars is 76-90"]
+      - summary: comfortable
+        signals: ["contrast_fails is 0", "min_body_px is 16+", "longest_line_chars is 45-75"]
+    fix: >-
+      Raise text contrast to at least 4.5:1 for body and 3:1 for large text, set body text to 16px or larger, and cap
+      line length at about 65 characters.
+    refs: ["WCAG 1.4.3 Contrast (Minimum)", "DESIGN_PRINCIPLES.md#Part 2: Typography"]
+
+  - id: a11y.structure
+    category: a11y
+    type: noul
+    weight: 2
+    threshold: 0.5
+    needs: [facts]
+    instructions: >-
+      Answer true if the page has a sound document structure. Read facts.a11y.heading_outline and
+      facts.a11y.landmarks. True when heading_outline is "ok" and landmarks contains "main". False otherwise.
+    criteria:
+      true: heading outline ok and a main landmark present
+      false: heading levels skipped, missing or duplicate h1, or no main landmark
+    fix: >-
+      Use exactly one h1, do not skip heading levels, and wrap the primary content in a main landmark with nav and
+      header landmarks where they apply.
+    refs: ["WCAG 1.3.1 Info and Relationships", "DESIGN_PRINCIPLES.md#Part 6: ARIA Patterns"]
+
+  - id: a11y.targets_and_focus
+    category: a11y
+    type: noul
+    weight: 2
+    threshold: 0.5
+    needs: [facts]
+    instructions: >-
+      Answer true if controls are operable by touch and keyboard. Read facts.a11y.small_targets and
+      facts.a11y.focus_visible_missing. True when small_targets is "0" and focus_visible_missing is false.
+    criteria:
+      true: no small targets and every focusable element shows a visible focus style
+      false: small tap targets, or focus styles removed without replacement
+    fix: >-
+      Enlarge tap targets to at least 44 by 44 px and restore a visible focus-visible outline (never outline none
+      without a replacement).
+    refs: ["WCAG 2.4.7 Focus Visible", "WCAG 2.5.8 Target Size", "DESIGN_PRINCIPLES.md#Part 6: Focus Management"]
+
+  - id: a11y.axe_clean
+    category: a11y
+    type: noul
+    weight: 2
+    threshold: 0.5
+    needs: [facts]
+    instructions: >-
+      Answer true if automated accessibility checks pass. Read facts.a11y.axe_serious. True when it is "0". False
+      otherwise.
+    criteria:
+      true: axe_serious is 0
+      false: one or more serious or critical axe violations
+    fix: Fix the serious and critical axe violations listed in the report (labels, names, roles, contrast).
+    refs: ["DESIGN_PRINCIPLES.md#Part 9: Accessibility Violations"]
+
+  # ───────────────────────────── copy ─────────────────────────────
+  - id: copy.cta_specificity
+    category: copy
+    type: score
+    weight: 2
+    threshold: 0.5
+    needs: [observations]
+    instructions: >-
+      Rate observations.copy.primary_cta. If it is empty, choose the lowest level.
+    criteria:
+      - summary: generic
+        signals: ["Submit", "Continue", "Learn more", "Get started", "Click here", "empty"]
+      - summary: adequate
+        signals: ["a verb is present but the outcome is vague", "'Sign up', 'Try it'"]
+      - summary: specific
+        signals: ["verb plus outcome in four words or fewer", "'Start free trial', 'Save changes', 'Create workspace'"]
+    fix: >-
+      Rewrite the primary call to action as a verb plus its outcome in brand.voice, four words or fewer, and keep the
+      same name through the flow (the button that says Publish leads to a toast that says Published).
+    refs: ["DESIGN_PRINCIPLES.md#Part 8: Labels & Messages", "frontend-design skill: more on writing in design"]
+
+  - id: copy.headline_concrete
+    category: copy
+    type: score
+    weight: 2
+    threshold: 0.5
+    needs: [observations, brand]
+    instructions: >-
+      Rate observations.copy.headline against brand.voice. If it is empty, choose the lowest level.
+    criteria:
+      - summary: marketing generic
+        signals: ["superlatives such as seamless, effortless, supercharge, unlock, revolutionize, next-generation", "empty"]
+      - summary: plain but vague
+        signals: ["names the category without saying what the product does for the reader"]
+      - summary: concrete and in voice
+        signals: ["one specific claim in plain words", "tone matches brand.voice"]
+    fix: >-
+      Replace superlatives with one concrete claim written from the reader's point of view, in brand.voice, using the
+      words people use for the task.
+    refs: ["DESIGN_PRINCIPLES.md#Part 8: Writing Style"]
+
+  - id: copy.tone_fit
+    category: copy
+    type: choice
+    weight: 2
+    threshold: 0.5
+    pass_choices: [on_voice]
+    needs: [observations, brand]
+    instructions: >-
+      Compare observations.copy.headline, observations.copy.primary_cta and observations.mood with brand.voice and pick
+      the closest description.
+    criteria:
+      on_voice:
+        what: tone matches the brand.voice adjectives
+      too_formal:
+        what: brand.voice is casual, warm or playful but the copy reads corporate or stiff
+        not_for: brands whose voice is formal, clinical or precise
+      too_casual:
+        what: brand.voice is precise, clinical or formal but the copy jokes or uses slang
+        not_for: brands whose voice is playful or friendly
+      marketing_generic:
+        what: copy uses superlatives and template phrasing that fit any product
+    fix_by_choice:
+      too_formal: "Loosen the copy toward brand.voice: shorter sentences, contractions, plain verbs."
+      too_casual: "Tighten the copy toward brand.voice: remove jokes and slang, keep sentences declarative and precise."
+      marketing_generic: "Replace superlatives and template phrasing with one concrete claim in brand.voice."
+    refs: ["DESIGN_PRINCIPLES.md#Part 8: Writing Style"]
+
+  - id: copy.empty_state_guidance
+    category: copy
+    type: noul
+    weight: 1
+    threshold: 0.5
+    needs: [observations]
+    instructions: >-
+      Read observations.patterns_present and observations.copy.empty_state. If patterns_present does not contain
+      "empty_state", answer true. If it does, answer true only when empty_state copy names a next action (a verb the
+      person can take). Answer false when the empty state is present but its copy is empty or only describes absence.
+    criteria:
+      true: no empty state on screen, or an empty state whose copy tells the person what to do next
+      false: an empty state whose copy is empty or only says that nothing is here
+    fix: >-
+      Write the empty state as an invitation to act: one line on what will appear here and a primary action that
+      creates it.
+    refs: ["DESIGN_PRINCIPLES.md#Part 4: State Handling", "frontend-design skill: treat failure and emptiness as moments for direction"]
+
+  - id: copy.case_and_length
+    category: copy
+    type: noul
+    weight: 1
+    hidden: true
+    bad_if_true: true
+    threshold: 0.5
+    needs: [observations]
+    instructions: >-
+      Answer true if the copy breaks basic conventions. Read observations.copy.headline and
+      observations.copy.primary_cta. True when either is written in ALL CAPS, when the primary_cta has more than five
+      words, or when the headline has more than fourteen words. False otherwise.
+    criteria:
+      true: all-caps copy, a primary action longer than five words, or a headline longer than fourteen words
+      false: sentence case, short action label, concise headline
+    refs: ["DESIGN_PRINCIPLES.md#Part 8: Writing Style"]

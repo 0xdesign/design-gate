@@ -1,0 +1,83 @@
+version: 1
+questions:
+  - id: pattern.anti_generic
+    category: pattern
+    type: noul
+    weight: 2
+    gate: true
+    threshold: 0.5
+    needs: [observations]
+    instructions: Does the screen show generic template traits?
+    criteria:
+      true: Generic traits are visible.
+      false: The composition is distinctive.
+    bad_if_true: true
+    fix: Remove the visible stock template traits.
+  - id: brand.palette_fit
+    category: brand
+    type: noul
+    weight: 2
+    gate: true
+    threshold: 0.6
+    needs: [facts, brand]
+    instructions: Does the palette fit the supplied brand?
+    fix: Use the supplied palette tokens.
+  - id: brand.type_fit
+    category: brand
+    type: noul
+    threshold: 0.6
+    needs: [facts, brand]
+    instructions: Does the typography fit the supplied brand?
+    fix: Use the supplied type families.
+  - id: craft.spacing
+    category: craft
+    type: noul
+    threshold: 0.6
+    instructions: Is spacing consistent?
+    fix: Align spacing to the grid.
+  - id: ux.hierarchy
+    category: ux
+    type: score
+    weight: 2
+    gate: true
+    threshold: 0.5
+    needs: [facts, observations]
+    instructions: Rate the visible hierarchy.
+    criteria:
+      - No discernible hierarchy.
+      - Some hierarchy but competing focal points.
+      - One clear focal point and supporting levels.
+    fix: Establish one clear focal point.
+  - id: copy.cta
+    category: copy
+    type: score
+    threshold: 0.5
+    needs: [observations]
+    applies_to: [conventional, expressive]
+    instructions: Rate the specificity of the primary CTA.
+    criteria:
+      - Generic CTA.
+      - Understandable CTA.
+      - Specific action and outcome.
+    fix: Make the CTA specific to the outcome.
+  - id: ux.pattern_choice
+    category: ux
+    type: choice
+    gate: true
+    needs: [observations]
+    instructions: Which pattern problem is visible?
+    criteria:
+      none: No pattern problem.
+      modal_overuse: A modal interrupts the primary flow.
+      hidden_action: The main action is difficult to find.
+    pass_choices: [none]
+    fix_by_choice:
+      modal_overuse: Keep the primary flow in the page.
+      hidden_action: Make the main action visible.
+  - id: craft.hidden_consistency
+    category: craft
+    type: noul
+    hidden: true
+    threshold: 0.6
+    instructions: Is the craft internally consistent?
+    fix: This hidden fix must never be emitted.
